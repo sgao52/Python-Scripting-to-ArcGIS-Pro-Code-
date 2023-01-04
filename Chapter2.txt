@@ -1,0 +1,282 @@
+CHAPTER 2 Creating Python functions and classes
+
+2.1 Introduction
+- Functions are organized into modules, and modules can be organized into a Python
+package. ArcPy itself is a collection of modules organized into a package.
+
+2.2 Functions and modules
+- Functions are blocks of code that perform a specific task, some built-in functions such as help(), int(), print() and str(). Using a functions is referred to as calling the function. For example:
+    name = "Shan"
+    print(name)
+    
+* The argument of the print() function i.e. name is a variable, and this variable has a value "Shan", the general syntax of a function is:
+    <function>(<arguments>)    Function arguments are also called parameters.
+    
+- A module is like an extension that can be imported into Python to extend its capabilities, typically, a module consists of several specialized functions. Modules are imported using a statement called import, general synatax:
+    import <module>
+
+* Example of using random module:
+    import random
+    random_number = random.randrange(1, 100)
+    print(random_number)
+
+* Example of using os module:
+    import os
+    os.mkdir("test")
+    
+* The general syntax to use a function from a module:
+    import <module>
+    <module>.<function>(<arguments>)
+
+- Arcpy is referred to as a package because it consists of several modules, functions, and classes.
+
+* Determines whether a shapefile exists:
+    import arcpy
+    print(arcpy.Exists("C:/sgao52/Downloads/123.shp"))
+
+- arcpy.da module is used for describing data, performing editing tasks, and following database workflows, the da.Describe() fuction determines the type of dataset, as well as several properties of the dataset.
+
+* Determines the geometry shape type of a shapefile:
+    import arcpy
+    desc = arcpy.da.Describe("C:/Data/123.shp")
+    print(desc["shapeType"])
+    
+- Arcpy also includes a Describe() function, so both arcpy.Describe() and arcpy.da.Describe() are valid fuctions, the difference with arcpy.da.Describe is that it returns a Python dictionary with most or all of the properties pre-populated.
+
+2.3 Creating fuctions
+- Python functions are defined using the def keyword. The synatax of the def statement is:
+    def <functionname>(<arguments>):
+
+* Example of def fuctions:
+    def printmessage():
+        print("Hello World")
+
+* Example of creating a list of names of all fields in a table or feature class:
+    import arcpy
+    arcpy.env.workspace = "C:/Data"
+    fields = arcpy.ListFields("streams.shp")
+    namelist = []
+    for field in fields:
+        namelist.append(field.name)
+
+- Instead of copying and pasting the entire code, user can defind a custom function, in this function, user have to pass a value to the function which is the name of a talbe, the last thing is a way for the function to pass values back, also referred to as returning values, which ensures that the function not only creates the list of name, but also returns the list so it can be used by any code that calls the function:
+
+* Example of list names of fields in a table function:
+    def listfieldnames(tablename):
+        fields = arcpy.ListFields(tablename)
+        namelist = []
+        for field in fields:
+            namelist.append(field.name)
+        return namelist
+
+* Example of using defined function:
+    fieldnames = listfieldnames("C:/Data/hospitals.shp")
+    
+tip: The custom function can be called only after it is defined.
+    
+* Example of calculating sinuosity using customized function:
+    import arcpy
+    import math
+    arcpy.env.workspace = "C:/Data/Hydro.gdb"
+    fc = "streams"
+    def sinuosity(shape):
+        channel = shape.length
+        deltaX = shape.firstPoint.X - shape.lastPoint.X
+        deltaY = shape.firstPoint.Y - shape.lastPoint.Y
+        valley = math.sqrt(pow(deltaX, 2) + pow(deltaY, 2))
+        return channel / valley
+    with arcpy.da.SearchCursor(fc, ["OID@", "SHAPE@"]) as cursor:
+        for row in cursor:
+            oid = row[0]
+            shape = row[1]
+            si = round(sinuosity(shape), 3)
+        print(f"Stream ID {oid} has a sinuosity index of {si}"
+
+tip: round(number, number of digits), the result show 1.3 rather than 1.300, an alternative is to use format codes to customize the print formatting, the format code .3f means the output is formatted using a floating-point number with three decimal places.
+        si = sinuosity(shape)
+        print(f"Stream ID {oid} has a sinuosity index of {si: .3f}")
+
+2.4 Calling functions from other scripts
+- Once functions are created in a script, they can be called from another script by importing the script that contains the function.
+
+* To call function in other scripts:
+    import helloworld
+    helloworld.printmessage()
+
+- The new script imports the helloworld.py script as a module - helloworld, the function is called using the regular syntax to call a function - that is:<module>.<function>.
+              
+- The first place Python looks for modules is the current folder, which is the folder in which the new script is located. The current folder can be obtained using sys.path():
+ 
+* Get the current folder location:
+    import sys
+    print(sys.path[0])         
+* Or:
+    import os
+    print(os.getcwd())          
+
+- Next, Python will look through all other system paths that have been set during the installation of python itself, these paths are contained in an environment variable called PYTHONPATH.
+              
+* To view a complete list of these paths:
+    import sys
+    for path in sys.path:
+        print(path)                  
+
+- To import the module/script from a different folder that is not in the current folder of the script or in any of the folders in sys.path, there are two options:
+              
+* Option 1 which could temporarily add a path to the script
+    import sys
+    sys.path.append("C:/OtherScript")          
+
+* Option 2 is to use a path configuration (.pth) file
+
+* Example of calling custom function called river_calculations.py:
+    import arcpy
+    import rivers
+    arcpy.env.workspace = "C:/Data/Hydro.gdb"
+    fc = "streams"
+    with arcpy.da.SearchCursor(fc, ["OID@", "SHAPE@"]) as cursor:
+        for row in cursor:
+            oid = row[0]
+            shape = row[1]
+            si = round(rivers.sinuosity(shape), 3)
+            print(f"Stream ID {oid} has a sinuosity index of {si}"              
+
+Note: When calling the custom function, the module must be included i.e. rivers.sinuosity()
+
+2.5 Organizing code into modules
+
+- This approach makes it easy to create new functions in a script and call them from another script. However, it also introduces a complication: How do you distinguish between running a script by itself and calling it from another script?
+
+- When you import the script file as a module, you don’t want the test code to run automatically, but only when you call the specific function. You want to be able to differentiate between running the script by itself and importing it as a module into another script. This is where the variable __name__ comes in (there are two underscores on each side). For any script, this variable has the value of "__main__".
+
+* Using an if statement distinguish between a script and a module:                      
+    def printmessage():
+        print("Hello world")
+    if __name__ == "__main__":
+        printmessage()
+
+* Structure of control running the script and makes it possible to use the same script in two different ways - running it by itself or calling it from another script:
+    import arcpy
+    <import other modules as needed>
+    def mycooltool(<arguments>):
+        <lines of code>
+        ...
+    if __name__ == "__main__":
+        mycooltool(<arguments>)
+
+* Test if the script is run on its own,it is clear the script does not perform any calculations without specific inputs:
+    import math
+    def sinuosity(shape):
+        channel = shape.length
+        deltaX = shape.firstPoint.X - shape.lastPoint.X
+        deltaY = shape.firstPoint.Y - shape.lastPoint.Y
+        valley = math.sqrt(pow(deltaX, 2) + pow(deltaY, 2))
+        return channel / valley
+    if __name__ == "__main__":
+        print("This script requires geometry objects as inputs.")
+
+2.6 Creating classes
+- A class provides a way to group together functions and variables that are closely related  so they can interact with each other. a class also makes it possible to work with multiple objects of the same type.
+                  
+- Classes are the container for these related functions and variables. Classes make it possible to create objects as defined by these functions and variables. Functions that are part of a class are called methods, and variables that are part of a class are called properties. (e.g. env class, result class), python class are defined:
+    class<classname>(object):
+
+- A class typically consists of one or more functions, which means the general structure of a class:
+    class <class>(object):
+        def <function1>(<arguments>):
+            <code>
+        def <function2>(<arguments>):
+            <code>
+
+* Simple example of create python class                  
+    class person (object):
+        def setname(self, name):
+            self.name = name
+        def greeting(self):          
+            print("My name is (0).".format(self.name))          
+                  
+Note: the class keyword is to create a python class called person. The class contains two method definitions. The self argument refers to the object itself.                  
+                  
+* Example of using person class created before:                  
+    me = person()
+    me.setname("Shan")
+    me.greeting()              
+                  
+* Example of creating the parcel class to calculate the tax:                  
+    class parcel(object):                  
+        def _init_(self, landuse, value):
+            self.landuse = landuse                  
+            self.value = value         
+        def assessment(self):          
+            if self.landuse == "SFR":      
+                rate = 0.05
+            elif self.landuse == "MFR":      
+                rate = 0.04  
+            else:      
+                rate = 0.02      
+            assessment = self.value * rate      
+            return assessment      
+Note: When the class is ued to create objects, however, the first argument(self) is not used because it represents the object itself and is provided implicitly by using the class. The _init_(method) is used to initialize or specify an object with its initial properties by giving the properties a value. The class can now be used to create parcel objects, which have properties called landuse and value.                
+                  
+* Call class function from another script:
+    import parcelclass   # script name
+    myparcel = parcelclass.parcel("SFR", 200000)              
+    print("Landuse: ", myparcel.landuse)              
+    mytax = myparcel.assessment()              
+    print(mytax)              
+                  
+Note: This approach works only if the parcelclass.py script resides in the same folder or in one of the well-known locations in which python looks for modules. And a parcel object is created using the:
+    <module>.<class>   ### i.e. parcelclass.parcel              
+                  
+2.7 Working with packages
+- A package is essentially another type of module, and it contains multiple modules that are closely related to each other. A regular module is stored as a .py file, while a package is stored as a folder / directory.
+                  
+- Technically, a package is a folder with a file called _init_.py in it, this file makes it possible to import a package as a module.                
+                  
+* To use the package in specific directory:
+    import sys
+    sys.path.append("C:/Myfolder")                  
+    import mytools              
+    output = mytools.analysis.<function>(<arguments>)              
+                  
+- Site package is a locally installed package that is available to all users of the PC. e.g. Numpy                  
+                  
+Note: ArcPy is not installed in Python's lib folder.                   
+                  
+### KEY POINTS OF THIS CHAPTER ###                 
+- Custom functions and classes allow user to organize the code into meaningful elements and reuse these elements whenever needed. It can limit repetitive code, reducing clutter in code, and being able to break complex tasks into smaller steps.                  
+                  
+- Custom functions can be called fom within the same script or another script. When create within same script, the definition must come before the code calls the function, i.e. define and then use. When calling from another script, user have to import the script name first as a module.
+                  
+- To test if a script is running by itself and import it as a module into another script, use if _name_ == "_main_": statement                   
+                  
+- Add a path to the script using sys.path.append()                  
+                  
+- Custom classes can be created using the class keyword, functions that are part of a class are called methods, and variables that are part of a class are called properties, class can be called from within the same script or from another script.                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
+                  
